@@ -1,4 +1,5 @@
-# osm-tileserver
+# A'tuin
+The great turtle that holds the world on its back.
 
 ## NOTE: below is the *plan*, not all of this is implemented yet
 
