@@ -12,7 +12,7 @@ It has two purposes:
   - rendering plain vector tiles containing a configurable subset of the OSM
     features
   - rendering highly dynamic tiles.  Specifically designed for "last groomed" ski
-    maps, but could also work well for "current congestion" levels if you have
+    maps, but could also work well for "current traffic congestion" levels if you have
     the data for it.
 
 Configuration files can select subsets of the network to load, and what features
