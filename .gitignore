@@ -1,3 +1,6 @@
 mason_packages
+node_modules
 *.pbf
 bin/server
+test/test
+*.dSYM

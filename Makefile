@@ -16,14 +16,18 @@ $(MASON):
 bin:
 	mkdir -p bin
 
-bin/server: src/server.cpp src/tile.hpp src/vector_tile.hpp src/web_mercator.hpp mason_packages bin
-	$(CXX) -o bin/server src/server.cpp $(MASON_FLAGS) $(CXXFLAGS) $(LDFLAGS) -DNDEBUG -O3 -lpthread -lz -lexpat -lboost_filesystem -lboost_system -lboost_chrono -lboost_regex -std=c++11
+bin/server: src/server.cpp src/tile.hpp src/vector_tile.hpp src/web_mercator.hpp mason_packages bin src/merge.hpp
+	$(CXX) -o bin/server src/server.cpp $(MASON_FLAGS) $(CXXFLAGS) $(LDFLAGS) -DNDEBUG -O3 -lpthread -lz -lexpat -lboost_filesystem -lboost_system -lboost_chrono -lboost_regex -std=c++14
 
 bin/decode: decode.cpp mason_packages bin
-	$(CXX) -o bin/decode decode.cpp $(MASON_FLAGS) $(CXXFLAGS) $(LDFLAGS) -DNDEBUG -O3 -std=c++11
+	$(CXX) -o bin/decode decode.cpp $(MASON_FLAGS) $(CXXFLAGS) $(LDFLAGS) -DNDEBUG -O3 -std=c++14
+
+test/test: test/test.cpp mason_packages src/merge.hpp
+	$(CXX) -o test/test test/test.cpp $(MASON_FLAGS) $(CXXFLAGS) $(LDFLAGS) -g -std=c++14 -Isrc
 
 clean:
 	rm -rf bin
+	rm -rf test/test
 
 # Mason dependencies
 $(MASON_HOME)/lib/libboost_regex.a:

@@ -1,5 +1,10 @@
 #pragma once
 
+#include <boost/geometry.hpp>
+#include <boost/geometry/index/rtree.hpp>
+#include <utility>
+#include <cstdint>
+
 typedef boost::geometry::model::point<double, 3, boost::geometry::cs::spherical_equatorial<boost::geometry::degree>> wgs84_point_t;
 typedef boost::geometry::model::segment<wgs84_point_t> wgs84_segment_t;
 typedef boost::geometry::model::linestring<wgs84_point_t> wgs84_linestring_t;

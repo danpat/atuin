@@ -6,6 +6,7 @@
 #include <boost/geometry.hpp>
 
 #include "web_mercator.hpp"
+#include "vector_tile.hpp"
 #include "common.hpp"
 
 namespace util { namespace tile {
