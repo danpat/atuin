@@ -153,14 +153,22 @@ void merge(const util::tile::tile_linestring_t &tile_line, tile_line_vector &lin
             // Joining two existing lines
             if (endmatch != ends.end() && startmatch != starts.end()) {
                 // Do the append
-                const auto endindex = endmatch->second;
-                const auto startindex = startmatch->second;
+                // We just pick the first value we find (TODO: a heuristic to optimize line lengths?)
+                const auto endindex = endmatch->second.back();
+                const auto startindex = startmatch->second.back();
                 //std::cout << "Copying from " << startindex << " to  " << endindex << " and size is  " << lines.size() << std::endl;
                 lines[endindex].insert(lines[endindex].end(), lines[startindex].begin(), lines[startindex].end());
 
-                ends[lines[endindex].back()] = endindex;
-                starts.erase(tile_line.back());
-                ends.erase(tile_line.front());
+                // Remove the item we found
+                endmatch->second.pop_back();
+                startmatch->second.pop_back();
+                if (endmatch->second.empty()) { ends.erase(endmatch->first); }
+                if (startmatch->second.empty()) { starts.erase(startmatch->first); }
+
+                // The endpoint of the second line now belongs to the first line,
+                // so make sure the last coordinate is in the ends index.
+                auto result = ends.emplace(lines[endindex].back(), std::vector<std::size_t>{endindex});
+                if (!result.second) { result.first->second.push_back(endindex); }
 
                 // No need to delete the line, nobody refers to it any more
                 //lines.erase(lines.begin()+startindex);
@@ -170,37 +178,53 @@ void merge(const util::tile::tile_linestring_t &tile_line, tile_line_vector &lin
 
             // Appending to the end of another line
             if (endmatch != ends.end()) {
-                // If there is already a line, and this line has 0 length, skip it
+                // If there is already a line, and this line has 0 length, discard this line
                 if (util::tile::tile_point_equal()(tile_line.front(), tile_line.back())) return;
-                const auto endindex = endmatch->second;
+                const auto endindex = endmatch->second.back();
                 const auto lastpt = tile_line.back();
-                ends[lastpt] = endindex;
+                // Remove the old endpoint
+                endmatch->second.pop_back();
+                if (endmatch->second.empty()) { ends.erase(endmatch->first); }
+
+                // Add the coordinate to the vector
                 lines[endindex].emplace_back(lastpt.get<0>(), lastpt.get<1>());
-                ends.erase(tile_line.front());
+
+                // Ensure the new end coordinate links to the right vector
+                auto result = ends.emplace(lines[endindex].back(), std::vector<std::size_t>{endindex});
+                if (!result.second) { result.first->second.push_back(endindex); }
+
                 return;
             }
 
             // Prepending to an existing line
             if (startmatch != starts.end()) {
-                // If there is already a line, and this line has 0 length, skip it
+                // If there is already a line, and this line has 0 length, discard this line
                 if (util::tile::tile_point_equal()(tile_line.front(), tile_line.back())) return;
-                const auto startindex = startmatch->second;
+                const auto startindex = startmatch->second.back();
                 const auto firstpt = tile_line.front();
-                starts[firstpt] = startindex;
+
+                // Remove the old startpoint
+                startmatch->second.pop_back();
+                if (startmatch->second.empty()) { starts.erase(startmatch->first); }
+
+                // Prepend the new coordinate
                 lines[startindex].emplace(lines[startindex].begin(), firstpt.get<0>(), firstpt.get<1>());
-                starts.erase(tile_line.back());
+
+                // Ensure the new start coordinate
+                auto result = starts.emplace(lines[startindex].front(), std::vector<std::size_t>{startindex});
+                if (!result.second) { result.first->second.push_back(startindex); }
+
                 return;
             }
 
             // Nothing to join to, insert a new line
             lines.push_back(tile_line);
-            starts[tile_line.front()] = lines.size() - 1;
-            ends[tile_line.back()] = lines.size() -1;
+            starts.emplace(tile_line.front(), std::vector<std::size_t>{ lines.size() - 1 });
+            ends.emplace(tile_line.back(), std::vector<std::size_t>{ lines.size() -1 });
 }
 
 int main(int argc, char* argv[])
 {
-    /*
     tile_line_vector lines_test;
     coordinate_line_map starts_test;
     coordinate_line_map ends_test;
@@ -210,6 +234,9 @@ int main(int argc, char* argv[])
 
     util::tile::tile_linestring_t part2; part2.emplace_back(2,2); part2.emplace_back(3,3);
     merge(part2, lines_test, starts_test, ends_test);
+
+    util::tile::tile_linestring_t part41; part41.emplace_back(7,7); part41.emplace_back(4,4);
+    merge(part41, lines_test, starts_test, ends_test);
 
     util::tile::tile_linestring_t part3; part3.emplace_back(3,3); part3.emplace_back(4,4);
     merge(part3, lines_test, starts_test, ends_test);
@@ -223,19 +250,21 @@ int main(int argc, char* argv[])
     util::tile::tile_linestring_t part6; part6.emplace_back(4,4); part6.emplace_back(5,5);
     merge(part6, lines_test, starts_test, ends_test);
 
-    for (const auto & start : starts_test) {
-        const auto &line = lines_test[start.second];
+    util::tile::tile_linestring_t part61; part61.emplace_back(4,4); part61.emplace_back(5,5);
+    merge(part61, lines_test, starts_test, ends_test);
 
-        for (const auto &pt : line) {
-            std::cout << pt.get<0>() << "," << pt.get<1>() << " ";
+    for (const auto & startlist : starts_test) {
+        for (const auto & start : startlist.second) {
+            const auto &line = lines_test[start];
+
+            for (const auto &pt : line) {
+                std::cout << pt.get<0>() << "," << pt.get<1>() << " ";
+            }
+            std::cout << std::endl;
         }
-        std::cout << std::endl;
     }
 
-
-
     return -1;
-    */
 
     std::shared_ptr<line_rtree_t> rtree_ptr;
 
@@ -373,16 +402,18 @@ int main(int argc, char* argv[])
                 line_layer_writer.add_uint32(util::vector_tile::EXTENT_TAG,
                                              util::vector_tile::EXTENT); // extent
                 std::int32_t id = 1;
-                for (const auto & start : starts) {
-                    const auto &line = lines[start.second];
-                    std::int32_t start_x = 0;
-                    std::int32_t start_y = 0;
-                    protozero::pbf_writer feature_writer(line_layer_writer, util::vector_tile::FEATURE_TAG);
-                    feature_writer.add_enum(util::vector_tile::GEOMETRY_TAG, util::vector_tile::GEOMETRY_TYPE_LINE);
-                    feature_writer.add_uint64(util::vector_tile::ID_TAG, id++);
-                    {
-                        protozero::packed_field_uint32 geometry(feature_writer, util::vector_tile::FEATURE_GEOMETRIES_TAG);
-                        util::tile::encodeLinestring(line, geometry, start_x, start_y);
+                for (const auto & startlist : starts) {
+                    for (const auto &start : startlist.second) {
+                        const auto &line = lines[start];
+                        std::int32_t start_x = 0;
+                        std::int32_t start_y = 0;
+                        protozero::pbf_writer feature_writer(line_layer_writer, util::vector_tile::FEATURE_TAG);
+                        feature_writer.add_enum(util::vector_tile::GEOMETRY_TAG, util::vector_tile::GEOMETRY_TYPE_LINE);
+                        feature_writer.add_uint64(util::vector_tile::ID_TAG, id++);
+                        {
+                            protozero::packed_field_uint32 geometry(feature_writer, util::vector_tile::FEATURE_GEOMETRIES_TAG);
+                            util::tile::encodeLinestring(line, geometry, start_x, start_y);
+                        }
                     }
                 }
                 /*
